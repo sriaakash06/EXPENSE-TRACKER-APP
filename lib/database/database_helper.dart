@@ -1,99 +1,135 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 import '../models/expense.dart';
 
-/// A local persistence layer backed by SharedPreferences.
-/// Stores expenses as a JSON array under the key [_kExpensesKey].
-/// This gives full CRUD with data persistence across app restarts,
-/// equivalent to a lightweight SQLite table.
+/// A local persistence layer backed by SQLite (sqflite).
+/// Gives full CRUD with data persistence locally, equivalent to a MySQL offline mobile table.
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   DatabaseHelper._internal();
 
-  static const String _kExpensesKey = 'expenses_v1';
+  static Database? _database;
 
-  // ────────────────────────────────────────────────────────────────
-  // Helpers
-  // ────────────────────────────────────────────────────────────────
-
-  Future<List<Expense>> _readAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kExpensesKey);
-    if (raw == null) return [];
-    final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
-    return list
-        .map((e) => Expense.fromMap(e as Map<String, dynamic>))
-        .toList();
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
   }
 
-  Future<void> _writeAll(List<Expense> expenses) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode(expenses.map((e) => e.toMap()).toList());
-    await prefs.setString(_kExpensesKey, encoded);
+  Future<Database> _initDatabase() async {
+    String path = join(await getDatabasesPath(), 'expenses.db');
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _onCreate,
+    );
+  }
+
+  Future _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE expenses(
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        amount REAL,
+        category TEXT,
+        date TEXT,
+        note TEXT
+      )
+    ''');
   }
 
   // ────────────────────────────────────────────────────────────────
-  // Public API  (mirrors a typical SQLite helper)
+  // Public API
   // ────────────────────────────────────────────────────────────────
 
   Future<int> insertExpense(Expense expense) async {
-    final all = await _readAll();
-    all.removeWhere((e) => e.id == expense.id); // upsert
-    all.add(expense);
-    await _writeAll(all);
-    return 1;
+    final db = await database;
+    return await db.insert(
+      'expenses',
+      expense.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Expense>> getAllExpenses() async {
-    final all = await _readAll();
-    all.sort((a, b) => b.date.compareTo(a.date));
-    return all;
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('expenses', orderBy: 'date DESC');
+    return List.generate(maps.length, (i) {
+      return Expense.fromMap(maps[i]);
+    });
   }
 
   Future<int> updateExpense(Expense expense) async {
-    final all = await _readAll();
-    final idx = all.indexWhere((e) => e.id == expense.id);
-    if (idx == -1) return 0;
-    all[idx] = expense;
-    await _writeAll(all);
-    return 1;
+    final db = await database;
+    return await db.update(
+      'expenses',
+      expense.toMap(),
+      where: 'id = ?',
+      whereArgs: [expense.id],
+    );
   }
 
   Future<int> deleteExpense(String id) async {
-    final all = await _readAll();
-    final before = all.length;
-    all.removeWhere((e) => e.id == id);
-    await _writeAll(all);
-    return before - all.length;
+    final db = await database;
+    return await db.delete(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
-  Future<List<Expense>> getExpensesByCategory(
-      ExpenseCategory category) async {
-    final all = await getAllExpenses();
-    return all.where((e) => e.category == category).toList();
+  Future<List<Expense>> getExpensesByCategory(ExpenseCategory category) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'expenses',
+      where: 'category = ?',
+      whereArgs: [category.name],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => Expense.fromMap(maps[i]));
   }
 
-  Future<List<Expense>> getExpensesByDateRange(
-      DateTime start, DateTime end) async {
-    final all = await getAllExpenses();
-    return all
-        .where((e) =>
-            e.date.isAfter(start.subtract(const Duration(seconds: 1))) &&
-            e.date.isBefore(end.add(const Duration(seconds: 1))))
-        .toList();
+  Future<List<Expense>> getExpensesByDateRange(DateTime start, DateTime end) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'expenses',
+      where: 'date > ? AND date < ?',
+      whereArgs: [
+        start.subtract(const Duration(seconds: 1)).toIso8601String(),
+        end.add(const Duration(seconds: 1)).toIso8601String()
+      ],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => Expense.fromMap(maps[i]));
   }
 
   Future<double> getTotalAmount() async {
-    final all = await getAllExpenses();
-    return all.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final db = await database;
+    final result = await db.rawQuery('SELECT SUM(amount) as total FROM expenses');
+    double total = 0.0;
+    if (result.isNotEmpty && result.first['total'] != null) {
+      total = (result.first['total'] as num).toDouble();
+    }
+    return total;
   }
 
   Future<Map<ExpenseCategory, double>> getCategoryTotals() async {
-    final all = await getAllExpenses();
+    final db = await database;
+    // We can group by category in SQL directly
+    final maps = await db.rawQuery('SELECT category, SUM(amount) as total FROM expenses GROUP BY category');
+    
     final Map<ExpenseCategory, double> totals = {};
-    for (final e in all) {
-      totals[e.category] = (totals[e.category] ?? 0) + e.amount;
+    for (final map in maps) {
+      final categoryStr = map['category'] as String;
+      final total = (map['total'] as num).toDouble();
+      
+      final category = ExpenseCategory.values.firstWhere(
+        (e) => e.name == categoryStr,
+        orElse: () => ExpenseCategory.other,
+      );
+      totals[category] = total;
     }
     return totals;
   }

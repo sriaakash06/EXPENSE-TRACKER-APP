@@ -6,7 +6,7 @@ import '../providers/expense_provider.dart';
 
 class AddEditExpenseSheet extends StatefulWidget {
   final ExpenseProvider provider;
-  final Expense? expense; // null = add mode
+  final Expense? expense;
 
   const AddEditExpenseSheet({
     super.key,
@@ -27,16 +27,24 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
   late DateTime _selectedDate;
   bool _isSaving = false;
 
+  // Track if we are in category picking mode or details mode
+  bool _pickingCategory = true;
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     final e = widget.expense;
     _titleCtrl = TextEditingController(text: e?.title ?? '');
-    _amountCtrl =
-        TextEditingController(text: e != null ? e.amount.toString() : '');
+    _amountCtrl = TextEditingController(text: e != null ? e.amount.toString() : '');
     _noteCtrl = TextEditingController(text: e?.note ?? '');
-    _selectedCategory = e?.category ?? ExpenseCategory.other;
+    _selectedCategory = e?.category ?? ExpenseCategory.food;
     _selectedDate = e?.date ?? DateTime.now();
+
+    // If editing, go straight to details to show current values
+    if (e != null) {
+      _pickingCategory = false;
+    }
   }
 
   @override
@@ -54,10 +62,9 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
+        data: ThemeData.light().copyWith(
+          colorScheme: const ColorScheme.light(
             primary: Color(0xFF7C3AED),
-            surface: Color(0xFF1E1E2E),
           ),
         ),
         child: child!,
@@ -72,7 +79,7 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
 
     final expense = Expense(
       id: widget.expense?.id ?? const Uuid().v4(),
-      title: _titleCtrl.text.trim(),
+      title: _titleCtrl.text.trim().isEmpty ? _selectedCategory.displayName : _titleCtrl.text.trim(),
       amount: double.parse(_amountCtrl.text.trim()),
       category: _selectedCategory,
       date: _selectedDate,
@@ -90,203 +97,310 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isEdit = widget.expense != null;
+    // This sheet acts like a full-screen or high modal mimicking the middle frame
     return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
-        color: Color(0xFF13131F),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        color: Color(0xFFF6F6F9),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      child: Stack(
+        children: [
+          // Top Gradient
+          Positioned(
+            top: 0, left: 0, right: 0, height: 250,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFFE4C9FF),
+                      Color(0xFFF0E0FF),
+                      Color(0xFFF6F6F9),
+                    ],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    stops: [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          SafeArea(
+            child: Column(
+              children: [
+                // Header mimicking mockup
+                Padding(
+                  padding: const EdgeInsets.only(top: 20, left: 24, right: 24, bottom: 20),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (!_pickingCategory && widget.expense == null) {
+                            setState(() => _pickingCategory = true);
+                          } else {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        child: Container(
+                          width: 44, height: 44,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.chevron_left_rounded, color: Color(0xFF1B1B2F)),
+                        ),
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            _pickingCategory ? 'Select Category' : (widget.expense == null ? 'Add Expense' : 'Edit Expense'),
+                            style: const TextStyle(
+                              color: Color(0xFF1B1B2F),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 44), // balance for center alignment
+                    ],
+                  ),
+                ),
+                
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: _pickingCategory ? _buildCategoryGrid() : _buildDetailsForm(),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCategoryGrid() {
+    final filteredCategories = ExpenseCategory.values.where((c) => 
+      c.displayName.toLowerCase().contains(_searchQuery.toLowerCase())
+    ).toList();
+
+    return Column(
+      key: const ValueKey('CategoryGrid'),
+      children: [
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 10, offset: const Offset(0, 4),
+                )
+              ]
+            ),
+            child: TextField(
+              onChanged: (v) => setState(() => _searchQuery = v),
+              decoration: InputDecoration(
+                hintText: 'Search for Categories',
+                hintStyle: const TextStyle(color: Color(0xFFC4C4CD)),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFC4C4CD)),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 24),
+        
+        // Grid View wrapped in Expanded container mimicking the card
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 24,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.7, // Adjust to fit circle and text
+              ),
+              itemCount: filteredCategories.length + 1, // +1 for "Add" button
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return _buildGridIcon(
+                    icon: Icons.add_rounded,
+                    color: const Color(0xFFC4C4CD),
+                    label: 'Add',
+                    onTap: () {},
+                  );
+                }
+                final cat = filteredCategories[index - 1];
+                return _buildGridIcon(
+                  icon: cat.icon,
+                  color: cat.color,
+                  label: cat.displayName,
+                  onTap: () {
+                    setState(() {
+                      _selectedCategory = cat;
+                      _pickingCategory = false; // Move to details step
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGridIcon({required IconData icon, required Color color, required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+              ]
+            ),
+            child: Center(
+              child: Icon(icon, color: color, size: 24),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF7A7A90),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsForm() {
+    return Container(
+      key: const ValueKey('DetailsForm'),
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      padding: const EdgeInsets.all(32),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
+              // Display selected category
+              Row(
+                children: [
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: _selectedCategory.color.withOpacity(0.15)),
+                    child: Icon(_selectedCategory.icon, color: _selectedCategory.color),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Text(_selectedCategory.displayName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B1B2F))),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _pickingCategory = true),
+                    child: const Text('Change', style: TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.w600)),
+                  )
+                ],
               ),
-              Text(
-                isEdit ? 'Edit Expense' : 'Add Expense',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(height: 24),
+
+              _buildTextFieldLabel('Amount (\$)', Icons.attach_money_rounded),
+              _buildTextField(
+                controller: _amountCtrl,
+                hint: '0.00',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Enter amount';
+                  if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+
+              _buildTextFieldLabel('Title', Icons.title_rounded),
+              _buildTextField(
+                controller: _titleCtrl,
+                hint: 'Optional title...',
+              ),
+              const SizedBox(height: 20),
+
+              _buildTextFieldLabel('Date', Icons.calendar_today_rounded),
+              GestureDetector(
+                onTap: _pickDate,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F6F9),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    DateFormat('d MMMM yyyy').format(_selectedDate),
+                    style: const TextStyle(color: Color(0xFF1B1B2F), fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // TITLE
-              _buildLabel('Title'),
-              const SizedBox(height: 6),
-              _buildTextField(
-                controller: _titleCtrl,
-                hint: 'e.g. Coffee, Groceries...',
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Please enter a title' : null,
-              ),
-              const SizedBox(height: 16),
-
-              // AMOUNT
-              _buildLabel('Amount (₹)'),
-              const SizedBox(height: 6),
-              _buildTextField(
-                controller: _amountCtrl,
-                hint: '0.00',
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Enter amount';
-                  if (double.tryParse(v.trim()) == null) {
-                    return 'Invalid number';
-                  }
-                  if (double.parse(v.trim()) <= 0) {
-                    return 'Must be greater than 0';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // CATEGORY
-              _buildLabel('Category'),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: ExpenseCategory.values.map((cat) {
-                    final isSelected = cat == _selectedCategory;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = cat),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 10),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? cat.color
-                              : cat.color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color:
-                                isSelected ? cat.color : Colors.transparent,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(cat.icon,
-                                size: 16,
-                                color: isSelected
-                                    ? Colors.white
-                                    : cat.color),
-                            const SizedBox(width: 6),
-                            Text(
-                              cat.displayName,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : cat.color,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // DATE
-              _buildLabel('Date'),
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: _pickDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E2E),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today_rounded,
-                          color: Color(0xFF7C3AED), size: 18),
-                      const SizedBox(width: 12),
-                      Text(
-                        DateFormat('d MMMM yyyy').format(_selectedDate),
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // NOTE
-              _buildLabel('Note (optional)'),
-              const SizedBox(height: 6),
+              _buildTextFieldLabel('Note', Icons.notes_rounded),
               _buildTextField(
                 controller: _noteCtrl,
-                hint: 'Add a short note...',
+                hint: 'Any extra details...',
                 maxLines: 2,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-              // SAVE BUTTON
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                    disabledBackgroundColor:
-                        const Color(0xFF7C3AED).withOpacity(0.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    backgroundColor: const Color(0xFF1B1B2F), // Dark purple button
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
                   child: _isSaving
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : Text(
-                          isEdit ? 'Update Expense' : 'Add Expense',
-                          style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
-                        ),
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Save Expense', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
+              SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
             ],
           ),
         ),
@@ -294,13 +408,18 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
     );
   }
 
-  Widget _buildLabel(String text) => Text(
-        text,
-        style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 13,
-            fontWeight: FontWeight.w600),
-      );
+  Widget _buildTextFieldLabel(String text, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF7A7A90)),
+          const SizedBox(width: 8),
+          Text(text, style: const TextStyle(color: Color(0xFF7A7A90), fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -314,34 +433,14 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
       keyboardType: keyboardType,
       validator: validator,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: Color(0xFF1B1B2F), fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white38),
+        hintStyle: const TextStyle(color: Color(0xFFC4C4CD)),
         filled: true,
-        fillColor: const Color(0xFF1E1E2E),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withOpacity(0.08)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withOpacity(0.08)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: Colors.redAccent, width: 1),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: const Color(0xFFF6F6F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }

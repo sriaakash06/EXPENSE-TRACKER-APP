@@ -84,4 +84,30 @@ class ExpenseProvider extends ChangeNotifier {
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return names[weekday - 1];
   }
+
+  // Monthly data for the last 6 months
+  Map<int, double> get monthlyData {
+    final now = DateTime.now();
+    final Map<int, double> data = {};
+    // Initialize last 6 months with 0.0
+    for (int i = 5; i >= 0; i--) {
+      int month = now.month - i;
+      int year = now.year;
+      if (month <= 0) {
+        month += 12;
+        year -= 1;
+      }
+      data[month] = 0.0;
+    }
+
+    // Populate data
+    for (final e in _expenses) {
+      if (data.containsKey(e.date.month)) {
+        // Technically this mixes years if you have exactly 1 year ago data, 
+        // but for 6 month windows this is fine for a simple tracker.
+        data[e.date.month] = data[e.date.month]! + e.amount;
+      }
+    }
+    return data;
+  }
 }

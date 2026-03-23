@@ -5,12 +5,13 @@ import 'providers/expense_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/add_edit_expense_sheet.dart';
+import 'screens/analytics_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
   ));
   runApp(const ExpenseTrackerApp());
 }
@@ -24,16 +25,14 @@ class ExpenseTrackerApp extends StatelessWidget {
       title: 'Expense Tracker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D0D1A),
-        colorScheme: const ColorScheme.dark(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF6F6F9),
+        colorScheme: const ColorScheme.light(
           primary: Color(0xFF7C3AED),
           secondary: Color(0xFFA78BFA),
-          surface: Color(0xFF1E1E2E),
+          surface: Colors.white,
         ),
-        textTheme: GoogleFonts.interTextTheme(
-          ThemeData.dark().textTheme,
-        ),
+        textTheme: GoogleFonts.interTextTheme(),
         useMaterial3: true,
       ),
       home: const HomeShell(),
@@ -89,13 +88,15 @@ class _HomeShellState extends State<HomeShell>
       animation: _provider,
       builder: (context, _) {
         return Scaffold(
-          backgroundColor: const Color(0xFF0D0D1A),
-          appBar: _buildAppBar(),
+          extendBody: true,
+          backgroundColor: const Color(0xFFF6F6F9),
           body: IndexedStack(
             index: _currentIndex,
             children: [
               DashboardScreen(provider: _provider),
-              ExpensesScreen(provider: _provider),
+              ExpensesScreen(provider: _provider), // You can style this later
+              AnalyticsScreen(provider: _provider),
+              const Center(child: Text("Account UI Pending")),
             ],
           ),
           bottomNavigationBar: _buildNavBar(),
@@ -107,82 +108,53 @@ class _HomeShellState extends State<HomeShell>
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    final titles = ['Dashboard', 'Expenses'];
-    return AppBar(
-      backgroundColor: const Color(0xFF0D0D1A),
-      elevation: 0,
-      title: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        child: Text(
-          titles[_currentIndex],
-          key: ValueKey(_currentIndex),
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      actions: [
-        if (_provider.isLoading)
-          const Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Color(0xFF7C3AED),
-                ),
-              ),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: IconButton(
-            icon: const Icon(Icons.bar_chart_rounded,
-                color: Color(0xFFA78BFA)),
-            onPressed: () {},
-            tooltip: 'Analytics',
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildNavBar() {
     return Container(
+      margin: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
       decoration: BoxDecoration(
-        color: const Color(0xFF13131F),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(35),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 20,
-            offset: const Offset(0, -4),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: BottomAppBar(
-        color: const Color(0xFF13131F),
+        color: Colors.transparent,
+        elevation: 0,
         shape: const CircularNotchedRectangle(),
-        notchMargin: 10,
+        notchMargin: 12,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _NavItem(
-              icon: Icons.dashboard_rounded,
-              label: 'Dashboard',
+              icon: Icons.home_filled,
+              label: 'Home',
               isSelected: _currentIndex == 0,
               onTap: () => setState(() => _currentIndex = 0),
             ),
-            const SizedBox(width: 60), // FAB space
             _NavItem(
-              icon: Icons.list_alt_rounded,
-              label: 'Expenses',
+              icon: Icons.receipt_long_rounded,
+              label: 'Transaction',
               isSelected: _currentIndex == 1,
               onTap: () => setState(() => _currentIndex = 1),
+            ),
+            const SizedBox(width: 40), // FAB space
+            _NavItem(
+              icon: Icons.bar_chart_rounded,
+              label: 'Analytics',
+              isSelected: _currentIndex == 2,
+              onTap: () => setState(() => _currentIndex = 2),
+            ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Account',
+              isSelected: _currentIndex == 3,
+              onTap: () => setState(() => _currentIndex = 3),
             ),
           ],
         ),
@@ -198,7 +170,7 @@ class _HomeShellState extends State<HomeShell>
           _fabController.forward().then((_) => _fabController.reverse());
           _openAddSheet();
         },
-        backgroundColor: const Color(0xFF7C3AED),
+        backgroundColor: const Color(0xFF1B1B2F), // Dark icon from mockup
         elevation: 8,
         shape: const CircleBorder(),
         child: Container(
@@ -206,14 +178,10 @@ class _HomeShellState extends State<HomeShell>
           height: 60,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: const Color(0xFF1B1B2F),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7C3AED).withOpacity(0.5),
+                color: const Color(0xFF1B1B2F).withOpacity(0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -244,40 +212,24 @@ class _NavItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFF7C3AED).withValues(alpha: 0.15)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected
-                    ? const Color(0xFF7C3AED)
-                    : Colors.white38,
-                size: 18,
-              ),
+            Icon(
+              icon,
+              color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFFB5B5C3),
+              size: 24,
             ),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF7C3AED)
-                    : Colors.white38,
-                fontSize: 9,
-                fontWeight: isSelected
-                    ? FontWeight.bold
-                    : FontWeight.normal,
+                color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFFB5B5C3),
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ],
