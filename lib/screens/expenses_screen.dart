@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../providers/expense_provider.dart';
 import '../models/expense.dart';
-import '../widgets/widgets.dart';
+import 'dashboard_screen.dart';
 import 'add_edit_expense_sheet.dart';
 
 class ExpensesScreen extends StatelessWidget {
@@ -13,14 +13,28 @@ class ExpensesScreen extends StatelessWidget {
     final filtered = provider.filteredExpenses;
     final categories = ['All', ...ExpenseCategory.values.map((e) => e.displayName)];
 
-    return Column(
-      children: [
-        // Filter chips
-        SizedBox(
-          height: 50,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.only(left: 24, top: 16, bottom: 16),
+            child: Text(
+              'Transactions',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          // Filter chips
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
             itemCount: categories.length,
             itemBuilder: (_, i) {
               final cat = categories[i];
@@ -33,23 +47,23 @@ class ExpensesScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF7C3AED)
-                        : const Color(0xFF1E1E2E),
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF7C3AED)
-                          : Colors.white.withOpacity(0.08),
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).dividerColor,
                     ),
                   ),
                   child: Center(
                     child: Text(
                       cat,
                       style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.white54,
+                        color: isSelected ? Theme.of(context).cardColor : Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: isSelected
                             ? FontWeight.bold
-                            : FontWeight.normal,
+                            : FontWeight.w600,
                         fontSize: 13,
                       ),
                     ),
@@ -69,28 +83,48 @@ class ExpensesScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.inbox_rounded,
-                          size: 64, color: Colors.white.withOpacity(0.15)),
+                          size: 64, color: Theme.of(context).disabledColor),
                       const SizedBox(height: 16),
-                      const Text('No expenses found',
+                      Text('No expenses found',
                           style:
-                              TextStyle(color: Colors.white54, fontSize: 16)),
+                              TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16)),
                     ],
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.only(left: 24, right: 24, top: 16),
                   itemCount: filtered.length,
                   itemBuilder: (_, i) {
                     final e = filtered[i];
-                    return ExpenseListTile(
-                      expense: e,
-                      onEdit: () => _showEditSheet(context, e),
-                      onDelete: () => _confirmDelete(context, e),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Dismissible(
+                        key: ValueKey(e.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 24),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6B6B),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Icon(Icons.delete_outline_rounded, color: Theme.of(context).cardColor),
+                        ),
+                        confirmDismiss: (direction) async {
+                          _confirmDelete(context, e);
+                          return false; // Dialog handles deletion
+                        },
+                        child: ExpenseListTileLight(
+                          expense: e,
+                          onTap: () => _showEditSheet(context, e),
+                        ),
+                      ),
                     );
                   },
                 ),
         ),
       ],
+    ),
     );
   }
 
@@ -107,20 +141,21 @@ class ExpensesScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E2E),
+        backgroundColor: Theme.of(context).cardColor,
+        surfaceTintColor: Colors.transparent,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Expense',
-            style: TextStyle(color: Colors.white)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('Delete Expense',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
         content: Text(
           'Delete "${e.title}"? This cannot be undone.',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: Text('Cancel',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
           TextButton(
             onPressed: () {
@@ -128,7 +163,7 @@ class ExpensesScreen extends StatelessWidget {
               provider.deleteExpense(e.id);
             },
             child: const Text('Delete',
-                style: TextStyle(color: Colors.redAccent)),
+                style: TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold)),
           ),
         ],
       ),

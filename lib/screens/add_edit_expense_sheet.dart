@@ -63,8 +63,8 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
       lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
         data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFF7C3AED),
+          colorScheme: ColorScheme.light(
+            primary: Theme.of(context).colorScheme.primary,
           ),
         ),
         child: child!,
@@ -100,9 +100,9 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
     // This sheet acts like a full-screen or high modal mimicking the middle frame
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF6F6F9),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Stack(
         children: [
@@ -112,16 +112,16 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Color(0xFFE4C9FF),
-                      Color(0xFFF0E0FF),
-                      Color(0xFFF6F6F9),
+                      Theme.of(context).colorScheme.primaryContainer,
+                      Theme.of(context).colorScheme.secondaryContainer,
+                      Theme.of(context).scaffoldBackgroundColor,
                     ],
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
-                    stops: [0.0, 0.5, 1.0],
+                    stops: const [0.0, 0.5, 1.0],
                   ),
                 ),
               ),
@@ -146,19 +146,19 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                         },
                         child: Container(
                           width: 44, height: 44,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.chevron_left_rounded, color: Color(0xFF1B1B2F)),
+                          child: Icon(Icons.chevron_left_rounded, color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
                       Expanded(
                         child: Center(
                           child: Text(
                             _pickingCategory ? 'Select Category' : (widget.expense == null ? 'Add Expense' : 'Edit Expense'),
-                            style: const TextStyle(
-                              color: Color(0xFF1B1B2F),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -197,7 +197,7 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -210,8 +210,8 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
               onChanged: (v) => setState(() => _searchQuery = v),
               decoration: InputDecoration(
                 hintText: 'Search for Categories',
-                hintStyle: const TextStyle(color: Color(0xFFC4C4CD)),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFC4C4CD)),
+                hintStyle: TextStyle(color: Theme.of(context).disabledColor),
+                prefixIcon: Icon(Icons.search_rounded, color: Theme.of(context).disabledColor),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
@@ -227,9 +227,9 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
             width: double.infinity,
             margin: const EdgeInsets.symmetric(horizontal: 24),
             padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             ),
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -243,7 +243,7 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                 if (index == 0) {
                   return _buildGridIcon(
                     icon: Icons.add_rounded,
-                    color: const Color(0xFFC4C4CD),
+                    color: Theme.of(context).disabledColor,
                     label: 'Add',
                     onTap: () {},
                   );
@@ -279,7 +279,7 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
@@ -292,8 +292,8 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF7A7A90),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -310,9 +310,9 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
     return Container(
       key: const ValueKey('DetailsForm'),
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       padding: const EdgeInsets.all(32),
       child: Form(
@@ -330,17 +330,17 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                     child: Icon(_selectedCategory.icon, color: _selectedCategory.color),
                   ),
                   const SizedBox(width: 12),
-                  Text(_selectedCategory.displayName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B1B2F))),
+                  Text(_selectedCategory.displayName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
                   const Spacer(),
                   TextButton(
                     onPressed: () => setState(() => _pickingCategory = true),
-                    child: const Text('Change', style: TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.w600)),
+                    child: Text('Change', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
                   )
                 ],
               ),
               const SizedBox(height: 24),
 
-              _buildTextFieldLabel('Amount (\$)', Icons.attach_money_rounded),
+              _buildTextFieldLabel('Amount (₹)', Icons.attach_money_rounded),
               _buildTextField(
                 controller: _amountCtrl,
                 hint: '0.00',
@@ -367,12 +367,12 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF6F6F9),
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
                     DateFormat('d MMMM yyyy').format(_selectedDate),
-                    style: const TextStyle(color: Color(0xFF1B1B2F), fontSize: 14, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                 ),
               ),
@@ -392,12 +392,12 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B1B2F), // Dark purple button
+                    backgroundColor: Theme.of(context).colorScheme.onSurface, // Dark purple button
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
                   child: _isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Save Expense', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ? CircularProgressIndicator(color: Theme.of(context).cardColor)
+                    : Text('Save Expense', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
@@ -413,9 +413,9 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: const Color(0xFF7A7A90)),
+          Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
-          Text(text, style: const TextStyle(color: Color(0xFF7A7A90), fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(text, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -433,12 +433,12 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
       keyboardType: keyboardType,
       validator: validator,
       maxLines: maxLines,
-      style: const TextStyle(color: Color(0xFF1B1B2F), fontWeight: FontWeight.w500),
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFFC4C4CD)),
+        hintStyle: TextStyle(color: Theme.of(context).disabledColor),
         filled: true,
-        fillColor: const Color(0xFFF6F6F9),
+        fillColor: Theme.of(context).scaffoldBackgroundColor,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
