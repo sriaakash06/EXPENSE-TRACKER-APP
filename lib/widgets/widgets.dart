@@ -17,8 +17,8 @@ class _PieChartWidgetState extends State<PieChartWidget> {
   @override
   Widget build(BuildContext context) {
     if (widget.data.isEmpty) {
-      return const Center(
-        child: Text('No data yet', style: TextStyle(color: Colors.white54)),
+      return Center(
+        child: Text('No data yet', style: TextStyle(color: Theme.of(context).cardColor.withOpacity(0.54))),
       );
     }
     final total = widget.data.values.fold(0.0, (a, b) => a + b);
@@ -79,7 +79,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
         titleStyle: TextStyle(
           fontSize: isTouched ? 14 : 11,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
         ),
       );
     });
@@ -106,7 +106,7 @@ class _LegendItem extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           '$label (${percent.toStringAsFixed(0)}%)',
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
+          style: TextStyle(color: Theme.of(context).cardColor.withOpacity(0.7), fontSize: 11),
         ),
       ],
     );
@@ -132,7 +132,7 @@ class BarChartWidget extends StatelessWidget {
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
                 '₹${rod.toY.toStringAsFixed(0)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
+                TextStyle(color: Theme.of(context).cardColor, fontSize: 12),
               );
             },
           ),
@@ -146,7 +146,7 @@ class BarChartWidget extends StatelessWidget {
                 if (val == 0) return const Text('');
                 return Text(
                   '₹${val.toInt()}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 9),
+                  style: TextStyle(color: Theme.of(context).cardColor.withOpacity(0.54), fontSize: 9),
                 );
               },
             ),
@@ -166,7 +166,7 @@ class BarChartWidget extends StatelessWidget {
                   child: Text(
                     days[idx],
                     style:
-                        const TextStyle(color: Colors.white70, fontSize: 11),
+                        TextStyle(color: Theme.of(context).cardColor.withOpacity(0.7), fontSize: 11),
                   ),
                 );
               },
@@ -177,7 +177,7 @@ class BarChartWidget extends StatelessWidget {
           show: true,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withOpacity(0.05),
+            color: Theme.of(context).cardColor.withOpacity(0.05),
             strokeWidth: 1,
           ),
         ),
@@ -189,8 +189,8 @@ class BarChartWidget extends StatelessWidget {
             barRods: [
               BarChartRodData(
                 toY: val,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFFA78BFA)],
+                gradient: LinearGradient(
+                  colors: [Theme.of(context).colorScheme.primary, const Color(0xFFA78BFA)],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                 ),
@@ -260,14 +260,14 @@ class _CategoryRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(category.displayName,
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: Theme.of(context).cardColor, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: percent,
-                        backgroundColor: Colors.white.withOpacity(0.08),
+                        backgroundColor: Theme.of(context).cardColor.withOpacity(0.08),
                         valueColor:
                             AlwaysStoppedAnimation<Color>(category.color),
                         minHeight: 6,
@@ -315,7 +315,7 @@ class StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.07)),
+        border: Border.all(color: Theme.of(context).cardColor.withOpacity(0.07)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,14 +330,14 @@ class StatCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(value,
-              style: const TextStyle(
-                  color: Colors.white,
+              style: TextStyle(
+                  color: Theme.of(context).cardColor,
                   fontSize: 18,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 2),
           Text(label,
               style:
-                  const TextStyle(color: Colors.white54, fontSize: 12)),
+                  TextStyle(color: Theme.of(context).cardColor.withOpacity(0.54), fontSize: 12)),
         ],
       ),
     );
@@ -380,9 +380,9 @@ class ExpenseListTile extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 6),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E2E),
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: Theme.of(context).cardColor.withOpacity(0.06)),
           ),
           child: Row(
             children: [
@@ -402,15 +402,15 @@ class ExpenseListTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(expense.title,
-                        style: const TextStyle(
-                            color: Colors.white,
+                        style: TextStyle(
+                            color: Theme.of(context).cardColor,
                             fontWeight: FontWeight.w600,
                             fontSize: 15)),
                     const SizedBox(height: 2),
                     Text(
                       '${expense.category.displayName} • ${dateFmt.format(expense.date)}',
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12),
+                      style: TextStyle(
+                          color: Theme.of(context).cardColor.withOpacity(0.54), fontSize: 12),
                     ),
                   ],
                 ),

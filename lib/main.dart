@@ -6,42 +6,77 @@ import 'screens/dashboard_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/add_edit_expense_sheet.dart';
 import 'screens/analytics_screen.dart';
+import 'screens/account_screen.dart';
+import 'screens/setup_wallet_screen.dart';
+final ExpenseProvider globalProvider = ExpenseProvider();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
   ));
-  runApp(const ExpenseTrackerApp());
+  runApp(ExpenseTrackerApp(provider: globalProvider));
 }
 
 class ExpenseTrackerApp extends StatelessWidget {
-  const ExpenseTrackerApp({super.key});
+  final ExpenseProvider provider;
+  const ExpenseTrackerApp({super.key, required this.provider});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Expense Tracker',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF6F6F9),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF7C3AED),
-          secondary: Color(0xFFA78BFA),
-          surface: Colors.white,
-        ),
-        textTheme: GoogleFonts.interTextTheme(),
-        useMaterial3: true,
-      ),
-      home: const HomeShell(),
+    return AnimatedBuilder(
+      animation: provider,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Expense Tracker',
+          debugShowCheckedModeBanner: false,
+          themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: const Color(0xFFF6F6F9),
+            cardColor: Colors.white,
+            colorScheme: const ColorScheme.light(
+              onSurface: Color(0xFF1B1B2F),
+              onSurfaceVariant: Color(0xFF7A7A90),
+              primaryContainer: Color(0xFFE4C9FF),
+              secondaryContainer: Color(0xFFF0E0FF),
+              primary: Color(0xFF7C3AED),
+              secondary: Color(0xFF8EE0A5),
+            ),
+            disabledColor: const Color(0xFFC4C4CD),
+            dividerColor: const Color(0xFFF3F3F6),
+            textTheme: GoogleFonts.interTextTheme(),
+            useMaterial3: true,
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            cardColor: const Color(0xFF1E1E2E),
+            colorScheme: const ColorScheme.dark(
+              onSurface: Colors.white,
+              onSurfaceVariant: Color(0xFFB5B5C3),
+              primaryContainer: Color(0xFF2C1A4A),
+              secondaryContainer: Color(0xFF1A382A),
+              primary: Color(0xFF9F7AEA),
+              secondary: Color(0xFF34D399),
+            ),
+            disabledColor: const Color(0xFF555566),
+            dividerColor: const Color(0xFF2A2A3A),
+            textTheme: GoogleFonts.interTextTheme(
+              ThemeData.dark().textTheme,
+            ),
+            useMaterial3: true,
+          ),
+          home: HomeShell(provider: provider),
+        );
+      },
     );
   }
 }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  final ExpenseProvider provider;
+  const HomeShell({super.key, required this.provider});
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -50,7 +85,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
-  final ExpenseProvider _provider = ExpenseProvider();
+  late final ExpenseProvider _provider = widget.provider;
   late AnimationController _fabController;
   late Animation<double> _fabAnimation;
 
@@ -87,16 +122,24 @@ class _HomeShellState extends State<HomeShell>
     return AnimatedBuilder(
       animation: _provider,
       builder: (context, _) {
+        if (_provider.isLoading) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        if (!_provider.hasSetWallet) {
+          return SetupWalletScreen(provider: _provider);
+        }
+
         return Scaffold(
           extendBody: true,
-          backgroundColor: const Color(0xFFF6F6F9),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: IndexedStack(
             index: _currentIndex,
             children: [
               DashboardScreen(provider: _provider),
-              ExpensesScreen(provider: _provider), // You can style this later
+              ExpensesScreen(provider: _provider), 
               AnalyticsScreen(provider: _provider),
-              const Center(child: Text("Account UI Pending")),
+              AccountScreen(provider: _provider),
             ],
           ),
           bottomNavigationBar: _buildNavBar(),

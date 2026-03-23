@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/expense.dart';
 import '../database/database_helper.dart';
 
@@ -6,13 +7,22 @@ class ExpenseProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
   List<Expense> _expenses = [];
   Map<ExpenseCategory, double> _categoryTotals = {};
-  bool _isLoading = false;
+  bool _isLoading = true;
   String _selectedFilter = 'All';
+  
+  double _initialWalletBalance = 0.0;
+  bool _hasSetWallet = false;
+  bool _isDarkMode = false;
 
   List<Expense> get expenses => _expenses;
   Map<ExpenseCategory, double> get categoryTotals => _categoryTotals;
   bool get isLoading => _isLoading;
   String get selectedFilter => _selectedFilter;
+  bool get hasSetWallet => _hasSetWallet;
+  bool get isDarkMode => _isDarkMode;
+  
+  double get currentWalletBalance => _initialWalletBalance - totalSpent;
+  double get initialWalletBalance => _initialWalletBalance;
 
   double get totalSpent =>
       _expenses.fold(0.0, (sum, e) => sum + e.amount);
@@ -30,9 +40,31 @@ class ExpenseProvider extends ChangeNotifier {
   Future<void> loadExpenses() async {
     _isLoading = true;
     notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey('initial_wallet_balance')) {
+      _initialWalletBalance = prefs.getDouble('initial_wallet_balance') ?? 0.0;
+      _hasSetWallet = true;
+    } else {
+      _hasSetWallet = false;
+    }
+
     _expenses = await _db.getAllExpenses();
     _categoryTotals = await _db.getCategoryTotals();
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> setInitialWalletBalance(double balance) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('initial_wallet_balance', balance);
+    _initialWalletBalance = balance;
+    _hasSetWallet = true;
+    notifyListeners();
+  }
+
+  void toggleTheme() {
+    _isDarkMode = !_isDarkMode;
     notifyListeners();
   }
 
