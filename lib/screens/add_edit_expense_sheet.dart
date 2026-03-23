@@ -95,6 +95,29 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Expense'),
+        content: const Text('Are you sure you want to delete this expense?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && widget.expense != null) {
+      await widget.provider.deleteExpense(widget.expense!.id);
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // This sheet acts like a full-screen or high modal mimicking the middle frame
@@ -165,7 +188,21 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 44), // balance for center alignment
+                      const SizedBox(width: 4), // balance for center alignment
+                      if (widget.expense != null)
+                        GestureDetector(
+                          onTap: _delete,
+                          child: Container(
+                            width: 44, height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 44),
                     ],
                   ),
                 ),
@@ -238,17 +275,9 @@ class _AddEditExpenseSheetState extends State<AddEditExpenseSheet> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.7, // Adjust to fit circle and text
               ),
-              itemCount: filteredCategories.length + 1, // +1 for "Add" button
+              itemCount: filteredCategories.length,
               itemBuilder: (context, index) {
-                if (index == 0) {
-                  return _buildGridIcon(
-                    icon: Icons.add_rounded,
-                    color: Theme.of(context).disabledColor,
-                    label: 'Add',
-                    onTap: () {},
-                  );
-                }
-                final cat = filteredCategories[index - 1];
+                final cat = filteredCategories[index];
                 return _buildGridIcon(
                   icon: cat.icon,
                   color: cat.color,

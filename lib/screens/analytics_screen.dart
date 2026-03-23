@@ -3,33 +3,58 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../services/export_service.dart';
+import '../models/expense.dart';
 
-class AnalyticsScreen extends StatelessWidget {
+class AnalyticsScreen extends StatefulWidget {
   final ExpenseProvider provider;
   const AnalyticsScreen({super.key, required this.provider});
 
   @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  // Get human readable month-year name
+  String _displayName(String key) {
+    try {
+      DateTime d = DateFormat('MM-yyyy').parse(key);
+      return DateFormat('MMMM yyyy').format(d);
+    } catch (_) {
+      return key;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+    final provider = widget.provider;
+    final _selectedMonthYear = provider.globalSelectedMonthYear;
 
-    // Using real data here:
-    double totalExpense = provider.totalSpent;
+    // Filter current selection
+    List<int> dateParts = _selectedMonthYear.split('-').map(int.parse).toList();
+    final currentSelectionExpenses = provider.getExpensesByMonth(dateParts[0], dateParts[1]);
+    
+    double totalSpentThisMonth = currentSelectionExpenses.fold(0.0, (sum, e) => sum + e.amount);
     double initialBudget = provider.initialWalletBalance;
-    double remaining = provider.currentWalletBalance;
+    double remaining = initialBudget - totalSpentThisMonth;
 
-    Map<int, double> monthData = provider.monthlyData;
-
-    final monthKeys = monthData.keys.toList()..sort();
+    // Charts use the last 6 months overall data
+    Map<String, double> monthData = provider.monthlyData;
+    final sortedKeys = monthData.keys.toList()
+      ..sort((a, b) {
+        DateTime da = DateFormat('MM-yyyy').parse(a);
+        DateTime db = DateFormat('MM-yyyy').parse(b);
+        return da.compareTo(db);
+      });
 
     // Find the max value to scale the chart
     double maxVal = 0;
     for (var val in monthData.values) {
       if (val > maxVal) maxVal = val;
     }
-    // Ensure budget line is visible on chart
     if (initialBudget > maxVal) maxVal = initialBudget;
-    if (maxVal == 0) maxVal = 100; // default for empty
-    maxVal = maxVal * 1.3; // add headroom
+    if (maxVal == 0) maxVal = 100;
+    maxVal = maxVal * 1.3;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -45,14 +70,9 @@ class AnalyticsScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Theme.of(context)
-                        .colorScheme
-                        .primaryContainer, // Light purple
-                    Theme.of(context)
-                        .colorScheme
-                        .secondaryContainer, // Lighter purple
-                    Theme.of(context)
-                        .scaffoldBackgroundColor, // Background color fade
+                    Theme.of(context).colorScheme.primaryContainer,
+                    Theme.of(context).colorScheme.secondaryContainer,
+                    Theme.of(context).scaffoldBackgroundColor,
                   ],
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
@@ -79,7 +99,7 @@ class AnalyticsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Export Buttons
+                  // Export Buttons - passed the filtered expenses
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -88,7 +108,12 @@ class AnalyticsScreen extends StatelessWidget {
                         'PDF', 
                         Icons.picture_as_pdf_rounded, 
                         const Color(0xFFFF6B6B),
-                        () => ExportService.exportToPdf(provider.expenses),
+                        () => ExportService.exportToPdf(
+                          currentSelectionExpenses, 
+                          title: 'Expense Report ${_displayName(_selectedMonthYear)}',
+                          budget: initialBudget,
+                          remaining: remaining,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       _buildExportButton(
@@ -96,7 +121,12 @@ class AnalyticsScreen extends StatelessWidget {
                         'Excel', 
                         Icons.table_view_rounded, 
                         const Color(0xFF34D399),
-                        () => ExportService.exportToExcel(provider.expenses),
+                        () => ExportService.exportToExcel(
+                          currentSelectionExpenses, 
+                          title: 'Expenses Export ${_displayName(_selectedMonthYear)}',
+                          budget: initialBudget,
+                          remaining: remaining,
+                        ),
                       ),
                     ],
                   ),
@@ -119,61 +149,60 @@ class AnalyticsScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        // Header of map
+                        // Header: Selectable Month
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                border: Border.all(
-                                    color: Theme.of(context).dividerColor),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Monthly',
-                                    style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                            PopupMenuButton<String>(
+                              onSelected: (val) => provider.setGlobalMonthYear(val),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              itemBuilder: (context) => sortedKeys.map((k) => PopupMenuItem(
+                                value: k,
+                                child: Text(_displayName(k), style: const TextStyle(fontSize: 13)),
+                              )).toList(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.transparent,
+                                  border: Border.all(color: Theme.of(context).dividerColor),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      _displayName(_selectedMonthYear),
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(Icons.keyboard_arrow_down_rounded,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                      size: 16),
-                                ],
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.keyboard_arrow_down_rounded,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        size: 16),
+                                  ],
+                                ),
                               ),
                             ),
                             Row(
                               children: [
-                                _buildLegendItem(
-                                    context,
-                                    Theme.of(context).colorScheme.secondary,
-                                    'Expense'),
+                                _buildLegendItem(context, const Color(0xFF818CF8), 'Budget'),
+                                const SizedBox(width: 8),
+                                _buildLegendItem(context, const Color(0xFF34D399), 'Expense'),
                               ],
                             ),
                           ],
                         ),
                         const SizedBox(height: 30),
 
-                        // Real logic Bar Chart
-                        if (totalExpense == 0)
+                        // Real logic Grouped Bar Chart
+                        if (monthData.values.every((v) => v == 0) && provider.expenses.isEmpty)
                           SizedBox(
                             height: 180,
                             child: Center(
-                              child: Text(
-                                  'No real data yet. Add expenses to populate.',
-                                  style: TextStyle(
-                                      color: Theme.of(context).disabledColor)),
+                              child: Text('No real data yet to show trends.',
+                                  style: TextStyle(color: Theme.of(context).disabledColor)),
                             ),
                           )
                         else
@@ -183,31 +212,48 @@ class AnalyticsScreen extends StatelessWidget {
                               BarChartData(
                                 alignment: BarChartAlignment.spaceAround,
                                 maxY: maxVal,
-                                barTouchData: BarTouchData(enabled: false),
+                                barTouchData: BarTouchData(
+                                  enabled: true,
+                                  touchTooltipData: BarTouchTooltipData(
+                                    getTooltipColor: (group) => Theme.of(context).cardColor,
+                                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                      String label = rodIndex == 0 ? "Budget" : "Spent";
+                                      return BarTooltipItem(
+                                        '$label\n',
+                                        TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
+                                        children: [
+                                          TextSpan(
+                                            text: fmt.format(rod.toY),
+                                            style: TextStyle(color: rod.color, fontSize: 13),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
                                 titlesData: FlTitlesData(
                                   show: true,
                                   bottomTitles: AxisTitles(
                                     sideTitles: SideTitles(
                                       showTitles: true,
                                       getTitlesWidget: (value, meta) {
-                                        final style = TextStyle(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 11,
-                                        );
                                         int index = value.toInt();
-                                        if (index < 0 ||
-                                            index >= monthKeys.length)
-                                          return const SizedBox.shrink();
-                                        int mth = monthKeys[index];
-                                        String text = DateFormat('MMM')
-                                            .format(DateTime(2023, mth));
+                                        if (index < 0 || index >= sortedKeys.length) return const SizedBox.shrink();
+                                        String key = sortedKeys[index];
+                                        DateTime d = DateFormat('MM-yyyy').parse(key);
+                                        String label = DateFormat('MMM').format(d);
                                         return Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 8.0),
-                                          child: Text(text, style: style),
+                                          padding: const EdgeInsets.only(top: 8.0),
+                                          child: Text(
+                                            label,
+                                            style: TextStyle(
+                                              color: key == _selectedMonthYear 
+                                                  ? Theme.of(context).colorScheme.primary 
+                                                  : Theme.of(context).colorScheme.onSurfaceVariant, 
+                                              fontWeight: FontWeight.bold, 
+                                              fontSize: 11
+                                            ),
+                                          ),
                                         );
                                       },
                                     ),
@@ -217,26 +263,16 @@ class AnalyticsScreen extends StatelessWidget {
                                       showTitles: true,
                                       reservedSize: 32,
                                       getTitlesWidget: (value, meta) {
-                                        if (value == 0)
-                                          return const SizedBox.shrink();
+                                        if (value == 0) return const SizedBox.shrink();
                                         return Text(
-                                          '₹${value.toInt()}',
-                                          style: TextStyle(
-                                            color:
-                                                Theme.of(context).disabledColor,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                          '₹${(value / 1000).toStringAsFixed(1)}k',
+                                          style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 10, fontWeight: FontWeight.w500),
                                         );
                                       },
                                     ),
                                   ),
-                                  topTitles: const AxisTitles(
-                                      sideTitles:
-                                          SideTitles(showTitles: false)),
-                                  rightTitles: const AxisTitles(
-                                      sideTitles:
-                                          SideTitles(showTitles: false)),
+                                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                 ),
                                 gridData: FlGridData(
                                   show: true,
@@ -247,34 +283,11 @@ class AnalyticsScreen extends StatelessWidget {
                                     strokeWidth: 1,
                                   ),
                                 ),
-                                extraLinesData: initialBudget > 0
-                                    ? ExtraLinesData(horizontalLines: [
-                                        HorizontalLine(
-                                          y: initialBudget,
-                                          color: const Color(0xFF7C3AED)
-                                              .withOpacity(0.7),
-                                          strokeWidth: 1.5,
-                                          dashArray: [6, 4],
-                                          label: HorizontalLineLabel(
-                                            show: true,
-                                            alignment: Alignment.topRight,
-                                            labelResolver: (line) =>
-                                                'Budget ${fmt.format(initialBudget)}',
-                                            style: const TextStyle(
-                                              color: Color(0xFF7C3AED),
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ])
-                                    : null,
                                 borderData: FlBorderData(show: false),
-                                barGroups: List.generate(monthKeys.length, (i) {
-                                  double expenseValue =
-                                      monthData[monthKeys[i]] ?? 0.0;
-                                  return _buildBarGroup(
-                                      context, i, expenseValue);
+                                barGroups: List.generate(sortedKeys.length, (i) {
+                                  double expenseValue = monthData[sortedKeys[i]] ?? 0.0;
+                                  bool isSelected = sortedKeys[i] == _selectedMonthYear;
+                                  return _buildBarGroup(context, i, initialBudget, expenseValue, isSelected);
                                 }),
                               ),
                             ),
@@ -285,13 +298,13 @@ class AnalyticsScreen extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  // Summary Cards
+                  // Summary Cards - updated with current selection
                   Row(
                     children: [
                       Expanded(
                         child: _buildSummaryCard(
                           context: context,
-                          title: 'Initial Budget',
+                          title: 'Monthly Budget',
                           amount: fmt.format(initialBudget),
                           icon: Icons.account_balance_wallet_rounded,
                           color: Theme.of(context).colorScheme.primary,
@@ -302,8 +315,8 @@ class AnalyticsScreen extends StatelessWidget {
                       Expanded(
                         child: _buildSummaryCard(
                           context: context,
-                          title: 'Total Spent',
-                          amount: fmt.format(totalExpense),
+                          title: 'Monthly Spent',
+                          amount: fmt.format(totalSpentThisMonth),
                           icon: Icons.receipt_long_rounded,
                           color: const Color(0xFFFF6B6B),
                           bgColor: const Color(0xFFFF6B6B).withOpacity(0.1),
@@ -316,60 +329,48 @@ class AnalyticsScreen extends StatelessWidget {
                     context: context,
                     title: remaining >= 0 ? 'Remaining Balance' : 'Over Budget By',
                     amount: fmt.format(remaining.abs()),
-                    icon: remaining >= 0
-                        ? Icons.savings_rounded
-                        : Icons.warning_amber_rounded,
-                    color: remaining >= 0
-                        ? const Color(0xFF34D399)
-                        : const Color(0xFFFF6B6B),
-                    bgColor: remaining >= 0
-                        ? const Color(0xFF34D399).withOpacity(0.1)
-                        : const Color(0xFFFF6B6B).withOpacity(0.1),
+                    icon: remaining >= 0 ? Icons.savings_rounded : Icons.warning_amber_rounded,
+                    color: remaining >= 0 ? const Color(0xFF34D399) : const Color(0xFFFF6B6B),
+                    bgColor: remaining >= 0 ? const Color(0xFF34D399).withOpacity(0.1) : const Color(0xFFFF6B6B).withOpacity(0.1),
                   ),
 
                   const SizedBox(height: 35),
 
-                  // History
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'History',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
+                  _sectionHeader(context, 'Monthly History'),
                   const SizedBox(height: 16),
 
-                  // History List backed by real data
-                  if (provider.expenses.isEmpty)
+                  // History for selected month
+                  if (currentSelectionExpenses.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text('No history available yet.',
-                          style: TextStyle(
-                              color: Theme.of(context).disabledColor)),
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Column(
+                        children: [
+                          Icon(Icons.calendar_today_outlined, color: Theme.of(context).disabledColor, size: 40),
+                          const SizedBox(height: 12),
+                          Text('No transactions for this month.',
+                              style: TextStyle(color: Theme.of(context).disabledColor)),
+                        ],
+                      ),
                     )
                   else
                     Container(
                       decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            )
-                          ]),
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      ),
                       child: Column(
-                        children: _buildRealHistoryList(context),
+                        children: _buildFilteredHistory(context, currentSelectionExpenses),
                       ),
                     ),
 
-                  const SizedBox(height: 120), // Spacing for bottom nav
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
@@ -379,15 +380,26 @@ class AnalyticsScreen extends StatelessWidget {
     );
   }
 
-  // Generate the history list grouping transactions dynamically by their actual dates recorded
-  List<Widget> _buildRealHistoryList(BuildContext context) {
-    // Group real expenses by essentially their date formatted string
+  Widget _sectionHeader(BuildContext context, String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildFilteredHistory(BuildContext context, List<Expense> expenses) {
+    expenses.sort((a, b) => b.date.compareTo(a.date));
     final Map<String, List<double>> grouped = {};
-    for (var e in provider.expenses) {
+    for (var e in expenses) {
       String dateStr = DateFormat('d MMMM yyyy').format(e.date);
-      if (!grouped.containsKey(dateStr)) {
-        grouped[dateStr] = [];
-      }
+      if (!grouped.containsKey(dateStr)) grouped[dateStr] = [];
       grouped[dateStr]!.add(e.amount);
     }
 
@@ -396,15 +408,10 @@ class AnalyticsScreen extends StatelessWidget {
     grouped.forEach((date, amounts) {
       rows.add(_buildHistoryRow(context, date, amounts));
       if (index < grouped.length - 1) {
-        rows.add(Divider(
-            height: 1,
-            color: Theme.of(context).dividerColor,
-            indent: 20,
-            endIndent: 20));
+        rows.add(Divider(height: 1, color: Theme.of(context).dividerColor, indent: 20, endIndent: 20));
       }
       index++;
     });
-
     return rows;
   }
 
@@ -412,39 +419,36 @@ class AnalyticsScreen extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.circular(2)),
+          width: 8, height: 8,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
       ],
     );
   }
 
-  BarChartGroupData _buildBarGroup(
-      BuildContext context, int x, double expenseVal) {
+  // GROUPED BAR GROUP [Budget, Spent]
+  BarChartGroupData _buildBarGroup(BuildContext context, int x, double budget, double expenseVal, bool isSelected) {
     return BarChartGroupData(
       x: x,
       barRods: [
+        // Budget Rod (Purple)
+        BarChartRodData(
+          toY: budget,
+          color: const Color(0xFF818CF8).withOpacity(isSelected ? 1.0 : 0.6),
+          width: 8,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        // Spent Rod (Green)
         BarChartRodData(
           toY: expenseVal,
-          color: Theme.of(context).colorScheme.secondary,
-          width: 10,
+          color: const Color(0xFF34D399).withOpacity(isSelected ? 1.0 : 0.6),
+          width: 8,
           borderRadius: BorderRadius.circular(4),
         ),
       ],
-      barsSpace: 6,
+      barsSpace: 4,
     );
   }
 
@@ -472,10 +476,7 @@ class AnalyticsScreen extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: bgColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 12),
@@ -483,22 +484,8 @@ class AnalyticsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  amount,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text(amount, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500)),
               ],
             ),
           )
@@ -507,58 +494,32 @@ class AnalyticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHistoryRow(
-      BuildContext context, String date, List<double> amounts) {
+  Widget _buildHistoryRow(BuildContext context, String date, List<double> amounts) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Date block
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Date',
-                style: TextStyle(
-                  color: Theme.of(context).disabledColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text('Date', style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 12, fontWeight: FontWeight.w500)),
               const SizedBox(height: 4),
-              Text(
-                date,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(date, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.w600)),
             ],
           ),
-          // Amounts block
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: amounts
-                .map((a) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '-₹${a.toInt()}',
-                        style: const TextStyle(
-                          color: Color(
-                              0xFFFF6B6B), // Expense red representing the user entries
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ))
-                .toList(),
+            children: amounts.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('-₹${a.toInt()}', style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 13, fontWeight: FontWeight.bold)),
+            )).toList(),
           ),
         ],
       ),
     );
   }
+
   Widget _buildExportButton(BuildContext context, String label, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,

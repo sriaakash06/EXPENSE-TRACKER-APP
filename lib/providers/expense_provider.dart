@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../models/expense.dart';
 import '../database/database_helper.dart';
 
@@ -9,6 +10,7 @@ class ExpenseProvider extends ChangeNotifier {
   Map<ExpenseCategory, double> _categoryTotals = {};
   bool _isLoading = true;
   String _selectedFilter = 'All';
+  String _globalSelectedMonthYear = DateFormat('MM-yyyy').format(DateTime.now());
   
   double _initialWalletBalance = 0.0;
   bool _hasSetWallet = false;
@@ -20,6 +22,7 @@ class ExpenseProvider extends ChangeNotifier {
   String get selectedFilter => _selectedFilter;
   bool get hasSetWallet => _hasSetWallet;
   bool get isDarkMode => _isDarkMode;
+  String get globalSelectedMonthYear => _globalSelectedMonthYear;
   
   double get currentWalletBalance => _initialWalletBalance - totalSpent;
   double get initialWalletBalance => _initialWalletBalance;
@@ -34,8 +37,22 @@ class ExpenseProvider extends ChangeNotifier {
         .fold(0.0, (sum, e) => sum + e.amount);
   }
 
-  List<Expense> get recentExpenses =>
-      _expenses.take(5).toList();
+  double get selectedMonthTotal {
+    List<int> parts = _globalSelectedMonthYear.split('-').map(int.parse).toList();
+    return _expenses
+        .where((e) => e.date.month == parts[0] && e.date.year == parts[1])
+        .fold(0.0, (sum, e) => sum + e.amount);
+  }
+  
+  void setGlobalMonthYear(String val) {
+    _globalSelectedMonthYear = val;
+    notifyListeners();
+  }
+
+  List<Expense> get recentExpenses {
+    List<int> parts = _globalSelectedMonthYear.split('-').map(int.parse).toList();
+    return _expenses.where((e) => e.date.month == parts[0] && e.date.year == parts[1]).take(5).toList();
+  }
 
   Future<void> loadExpenses() async {
     _isLoading = true;
@@ -89,12 +106,16 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   List<Expense> get filteredExpenses {
-    if (_selectedFilter == 'All') return _expenses;
+    List<int> parts = _globalSelectedMonthYear.split('-').map(int.parse).toList();
+    var monthExpenses = _expenses.where((e) => e.date.month == parts[0] && e.date.year == parts[1]).toList();
+
+    if (_selectedFilter == 'All') return monthExpenses;
+    
     final cat = ExpenseCategory.values.firstWhere(
       (e) => e.displayName == _selectedFilter,
       orElse: () => ExpenseCategory.other,
     );
-    return _expenses.where((e) => e.category == cat).toList();
+    return monthExpenses.where((e) => e.category == cat).toList();
   }
 
   // Weekly data for bar chart
@@ -117,29 +138,31 @@ class ExpenseProvider extends ChangeNotifier {
     return names[weekday - 1];
   }
 
-  // Monthly data for the last 6 months
-  Map<int, double> get monthlyData {
+  List<Expense> getExpensesByMonth(int month, int year) {
+    return _expenses.where((e) => e.date.month == month && e.date.year == year).toList();
+  }
+
+  // Monthly data for the last 6 months - returns Map<String, double> with month-year keys
+  Map<String, double> get monthlyData {
     final now = DateTime.now();
-    final Map<int, double> data = {};
-    // Initialize last 6 months with 0.0
+    final Map<String, double> data = {};
     for (int i = 5; i >= 0; i--) {
-      int month = now.month - i;
-      int year = now.year;
-      if (month <= 0) {
-        month += 12;
-        year -= 1;
-      }
-      data[month] = 0.0;
+      DateTime d = DateTime(now.year, now.month - i, 1);
+      String key = DateFormat('MM-yyyy').format(d);
+      data[key] = 0.0;
     }
 
-    // Populate data
     for (final e in _expenses) {
-      if (data.containsKey(e.date.month)) {
-        // Technically this mixes years if you have exactly 1 year ago data, 
-        // but for 6 month windows this is fine for a simple tracker.
-        data[e.date.month] = data[e.date.month]! + e.amount;
+      String eKey = DateFormat('MM-yyyy').format(e.date);
+      if (data.containsKey(eKey)) {
+        data[eKey] = data[eKey]! + e.amount;
       }
     }
     return data;
+  }
+
+  Future<void> resetAll() async {
+    await _db.clearAllExpenses();
+    await loadExpenses();
   }
 }

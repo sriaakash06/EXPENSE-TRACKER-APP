@@ -85,4 +85,10 @@ class DatabaseHelper {
     }
     return totals;
   }
+
+  Future<void> clearAllExpenses() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+    await prefs.remove('initial_wallet_balance'); // Also reset budget
+  }
 }

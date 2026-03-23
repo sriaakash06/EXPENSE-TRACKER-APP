@@ -3,6 +3,7 @@ import '../providers/expense_provider.dart';
 import '../models/expense.dart';
 import 'dashboard_screen.dart';
 import 'add_edit_expense_sheet.dart';
+import '../widgets/expense_list_tile.dart';
 
 class ExpensesScreen extends StatelessWidget {
   final ExpenseProvider provider;

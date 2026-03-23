@@ -3,27 +3,82 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../models/expense.dart';
-import 'dashboard_screen.dart';
 import 'add_edit_expense_sheet.dart';
+import '../widgets/expense_list_tile.dart';
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   final ExpenseProvider provider;
   const AccountScreen({super.key, required this.provider});
 
   @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
+  String _displayName(String key) {
+    try {
+      DateTime d = DateFormat('MM-yyyy').parse(key);
+      return DateFormat('MMMM yyyy').format(d);
+    } catch (_) {
+      return key;
+    }
+  }
+
+  Future<void> _clearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear All Data?'),
+        content: const Text('This will delete all expenses and reset your wallet budget. This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear Everything'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await widget.provider.resetAll();
+      widget.provider.setGlobalMonthYear(DateFormat('MM-yyyy').format(DateTime.now()));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All data cleared successfully.')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+    final provider = widget.provider;
+    final _selectedMonthYear = provider.globalSelectedMonthYear;
 
-    // ── stats ──
-    final totalSpent = provider.totalSpent;
+    // Filter current selection
+    List<int> dateParts = _selectedMonthYear.split('-').map(int.parse).toList();
+    final currentExpenses = provider.getExpensesByMonth(dateParts[0], dateParts[1]);
+
+    final totalSpentThisMonth = currentExpenses.fold(0.0, (sum, e) => sum + e.amount);
     final initialBudget = provider.initialWalletBalance;
-    final remaining = provider.currentWalletBalance;
-    final txCount = provider.expenses.length;
-    final thisMonth = provider.thisMonthTotal;
+    final remaining = initialBudget - totalSpentThisMonth;
+    final txCount = currentExpenses.length;
 
-    // ── category breakdown for pie ──
+    // Monthly data for the dropdown
+    Map<String, double> monthData = provider.monthlyData;
+    final sortedKeys = monthData.keys.toList()
+      ..sort((a, b) {
+        DateTime da = DateFormat('MM-yyyy').parse(a);
+        DateTime db = DateFormat('MM-yyyy').parse(b);
+        return da.compareTo(db);
+      });
+
+    // Category breakdown for pie based on CURRENT selection
     final Map<ExpenseCategory, double> catTotals = {};
-    for (final e in provider.expenses) {
+    for (final e in currentExpenses) {
       catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
     }
     final pieData = catTotals.entries.toList()
@@ -63,15 +118,26 @@ class AccountScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 10),
                   // Header
-                  Text(
-                    'Account',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const SizedBox(width: 48), // Spacer
+                      Text(
+                        'Account',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _clearAll,
+                        icon: const Icon(Icons.refresh_rounded, color: Colors.redAccent, size: 22),
+                        tooltip: 'Reset Tracker',
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
                   // Avatar + name
                   Container(
@@ -90,14 +156,34 @@ class AccountScreen extends StatelessWidget {
                         color: Colors.white, size: 36),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'My Wallet',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  
+                  // Month Dropdown
+                  PopupMenuButton<String>(
+                    onSelected: (val) => provider.setGlobalMonthYear(val),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    itemBuilder: (context) => sortedKeys.map((k) => PopupMenuItem(
+                      value: k,
+                      child: Text(_displayName(k), style: const TextStyle(fontSize: 13)),
+                    )).toList(),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _displayName(_selectedMonthYear),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down_rounded,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            size: 20),
+                      ],
                     ),
                   ),
+
                   const SizedBox(height: 4),
                   Text(
                     remaining >= 0
@@ -117,19 +203,20 @@ class AccountScreen extends StatelessWidget {
                   // Stats Row
                   Row(
                     children: [
-                      _statTile(context, 'Initial Budget', fmt.format(initialBudget),
+                      _statTile(context, 'Set Budget', fmt.format(initialBudget),
                           Icons.account_balance_wallet_rounded,
                           Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 12),
-                      _statTile(context, 'Total Spent', fmt.format(totalSpent),
+                      _statTile(context, 'Month Spent', fmt.format(totalSpentThisMonth),
                           Icons.receipt_long_rounded, const Color(0xFFFF6B6B)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      _statTile(context, 'This Month', fmt.format(thisMonth),
-                          Icons.calendar_month_rounded, const Color(0xFFFBBF24)),
+                      _statTile(context, 'Status', remaining >= 0 ? 'Safe' : 'Critical',
+                          remaining >= 0 ? Icons.check_circle_rounded : Icons.warning_rounded, 
+                          remaining >= 0 ? const Color(0xFF34D399) : const Color(0xFFFF6B6B)),
                       const SizedBox(width: 12),
                       _statTile(context, 'Transactions', '$txCount',
                           Icons.swap_horiz_rounded, const Color(0xFF818CF8)),
@@ -140,7 +227,7 @@ class AccountScreen extends StatelessWidget {
 
                   // Pie Chart Card
                   if (pieData.isNotEmpty) ...[
-                    _sectionTitle(context, 'Spending by Category'),
+                    _sectionTitle(context, 'Category Stats'),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -161,9 +248,9 @@ class AccountScreen extends StatelessWidget {
                             height: 200,
                             child: PieChart(
                               PieChartData(
-                                sections: pieData.take(6).map((entry) {
-                                  final pct = totalSpent > 0
-                                      ? (entry.value / totalSpent * 100)
+                                sections: pieData.map((entry) {
+                                  final pct = totalSpentThisMonth > 0
+                                      ? (entry.value / totalSpentThisMonth * 100)
                                       : 0.0;
                                   return PieChartSectionData(
                                     value: entry.value,
@@ -188,7 +275,7 @@ class AccountScreen extends StatelessWidget {
                             spacing: 12,
                             runSpacing: 8,
                             alignment: WrapAlignment.center,
-                            children: pieData.take(6).map((entry) {
+                            children: pieData.map((entry) {
                               return Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -231,11 +318,11 @@ class AccountScreen extends StatelessWidget {
                     const SizedBox(height: 28),
                   ],
 
-                  // Transactions list
-                  if (provider.expenses.isNotEmpty) ...[
-                    _sectionTitle(context, 'All Transactions'),
+                  // Transactions list for selected month
+                  if (currentExpenses.isNotEmpty) ...[
+                    _sectionTitle(context, 'Monthly History'),
                     const SizedBox(height: 16),
-                    ...provider.expenses.map((e) => Padding(
+                    ...currentExpenses.map((e) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: ExpenseListTileLight(
                             expense: e,
@@ -244,18 +331,18 @@ class AccountScreen extends StatelessWidget {
                         )),
                   ] else
                     Padding(
-                      padding: const EdgeInsets.all(40),
+                      padding: const EdgeInsets.symmetric(vertical: 40),
                       child: Column(
                         children: [
-                          Icon(Icons.inbox_rounded,
-                              size: 60,
+                          Icon(Icons.calendar_today_rounded,
+                              size: 50,
                               color: Theme.of(context).disabledColor),
                           const SizedBox(height: 12),
                           Text(
-                            'No transactions yet',
+                            'No data for ${_displayName(_selectedMonthYear)}',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              fontSize: 16,
+                              fontSize: 15,
                             ),
                           ),
                         ],
@@ -348,7 +435,10 @@ class AccountScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AddEditExpenseSheet(provider: provider, expense: e),
-    );
+      builder: (_) => AddEditExpenseSheet(provider: widget.provider, expense: e),
+    ).then((_) {
+      // Reload on back to reflect changes
+      setState(() {});
+    });
   }
 }
