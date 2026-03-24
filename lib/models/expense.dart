@@ -7,7 +7,7 @@ enum ExpenseCategory {
   health,
   entertainment,
   education,
-  utilities,
+  electricity,
   home,
   insurance,
   marketing,
@@ -17,19 +17,20 @@ enum ExpenseCategory {
   gym,
   subscription,
   vacation,
+  hotels,
   other,
 }
 
 extension ExpenseCategoryExtension on ExpenseCategory {
   String get displayName {
     switch (this) {
-      case ExpenseCategory.food: return 'Groceries';
+      case ExpenseCategory.food: return 'Food';
       case ExpenseCategory.transport: return 'Travel';
       case ExpenseCategory.shopping: return 'Shopping';
       case ExpenseCategory.health: return 'Health';
       case ExpenseCategory.entertainment: return 'Entertainment';
       case ExpenseCategory.education: return 'Education';
-      case ExpenseCategory.utilities: return 'Utilities';
+      case ExpenseCategory.electricity: return 'Electricity';
       case ExpenseCategory.home: return 'Home';
       case ExpenseCategory.insurance: return 'Insurance';
       case ExpenseCategory.marketing: return 'Marketing';
@@ -39,19 +40,20 @@ extension ExpenseCategoryExtension on ExpenseCategory {
       case ExpenseCategory.gym: return 'Gym';
       case ExpenseCategory.subscription: return 'Subscription';
       case ExpenseCategory.vacation: return 'Vacation';
+      case ExpenseCategory.hotels: return 'Hotels';
       case ExpenseCategory.other: return 'Other';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case ExpenseCategory.food: return Icons.local_grocery_store_rounded;
+      case ExpenseCategory.food: return Icons.restaurant_rounded;
       case ExpenseCategory.transport: return Icons.flight_rounded;
       case ExpenseCategory.shopping: return Icons.shopping_bag_rounded;
       case ExpenseCategory.health: return Icons.medical_services_rounded;
       case ExpenseCategory.entertainment: return Icons.movie_rounded;
       case ExpenseCategory.education: return Icons.menu_book_rounded;
-      case ExpenseCategory.utilities: return Icons.bolt_rounded;
+      case ExpenseCategory.electricity: return Icons.bolt_rounded;
       case ExpenseCategory.home: return Icons.home_rounded;
       case ExpenseCategory.insurance: return Icons.shield_rounded;
       case ExpenseCategory.marketing: return Icons.campaign_rounded;
@@ -61,6 +63,7 @@ extension ExpenseCategoryExtension on ExpenseCategory {
       case ExpenseCategory.gym: return Icons.fitness_center_rounded;
       case ExpenseCategory.subscription: return Icons.notifications_active_rounded;
       case ExpenseCategory.vacation: return Icons.park_rounded;
+      case ExpenseCategory.hotels: return Icons.hotel_rounded;
       case ExpenseCategory.other: return Icons.grid_view_rounded;
     }
   }
@@ -73,7 +76,7 @@ extension ExpenseCategoryExtension on ExpenseCategory {
       case ExpenseCategory.health: return const Color(0xFFFF8B94); // Pinkish red
       case ExpenseCategory.entertainment: return const Color(0xFFA78BFA); // Purple
       case ExpenseCategory.education: return const Color(0xFF818CF8); // Indigo
-      case ExpenseCategory.utilities: return const Color(0xFFFBBF24); // Yellow
+      case ExpenseCategory.electricity: return const Color(0xFFFBBF24); // Yellow
       case ExpenseCategory.home: return const Color(0xFFC084FC); // Purple
       case ExpenseCategory.insurance: return const Color(0xFF2DD4BF); // Teal
       case ExpenseCategory.marketing: return const Color(0xFFFBBF24); // Yellow
@@ -83,6 +86,7 @@ extension ExpenseCategoryExtension on ExpenseCategory {
       case ExpenseCategory.gym: return const Color(0xFFFB923C); // Orange
       case ExpenseCategory.subscription: return const Color(0xFFC084FC); // Purple
       case ExpenseCategory.vacation: return const Color(0xFF34D399); // Green
+      case ExpenseCategory.hotels: return const Color(0xFFF43F5E); // Rose
       case ExpenseCategory.other: return const Color(0xFF9CA3AF); // Gray
     }
   }
